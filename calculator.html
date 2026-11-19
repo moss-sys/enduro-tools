@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Калькулятор аренды эндуро</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Manrope:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Раскладка: слева вводные группами, справа прилипающий итог по трём ценам. Вид рабочего журнала мастерской: плотные строки, цифры моноширинные. */
+:root{
+  --bg:#f2f4f3; --surface:#ffffff; --ink:#18211f; --muted:#5d6966; --line:#d5dbd8;
+  --accent:#0d6e66; --accent-ink:#ffffff; --good:#1a7a43; --bad:#b3321f;
+  --s-fuel:#c98a1b; --s-serv:#7a5cb8; --s-amort:#3d78b5; --s-other:#8a9491; --s-tax:#b5566b; --s-profit:#1a7a43;
+  --f-head:"Manrope","Golos Text",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#131917; --surface:#1b2321; --ink:#e6ecea; --muted:#95a19d; --line:#2f3a37;
+  --accent:#4fb8ad; --accent-ink:#0b1513; --good:#5cc486; --bad:#ef7d68;
+  --s-fuel:#d9a23c; --s-serv:#9d84d6; --s-amort:#6a9fd6; --s-other:#6f7a77; --s-tax:#d27d90; --s-profit:#5cc486;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#131917; --surface:#1b2321; --ink:#e6ecea; --muted:#95a19d; --line:#2f3a37;
+  --accent:#4fb8ad; --accent-ink:#0b1513; --good:#5cc486; --bad:#ef7d68;
+  --s-fuel:#d9a23c; --s-serv:#9d84d6; --s-amort:#6a9fd6; --s-other:#6f7a77; --s-tax:#d27d90; --s-profit:#5cc486;
+  color-scheme:dark }
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-block:24px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:baseline;justify-content:space-between;margin-bottom:20px}
+h1{font-family:var(--f-head);font-size:26px;font-weight:700;margin:0;text-wrap:balance}
+header p{margin:0;color:var(--muted);max-width:60ch}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:24px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+.inputs{display:flex;flex-direction:column;gap:20px;min-width:0}
+fieldset{border:0;border-top:2px solid var(--ink);margin:0;padding:10px 0 0;min-width:0}
+legend{font-family:var(--f-head);font-weight:700;font-size:16px;padding:0 8px 0 0}
+.hint{color:var(--muted);font-size:13px;margin:2px 0 8px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 124px;gap:10px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line)}
+.row label{min-width:0}
+.row small{display:block;color:var(--muted);font-size:12px}
+input[type=number],input[type=text]{width:100%;font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0}
+input[type=number]{font-family:var(--f-num);font-size:14px;text-align:right}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.check{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.check input{width:18px;height:18px;accent-color:var(--accent)}
+.list-head,.item{display:grid;gap:6px;align-items:center}
+.cols3{grid-template-columns:minmax(0,1fr) 84px 84px 62px 28px}
+.cols2{grid-template-columns:minmax(0,1fr) 100px 28px}
+.list-head{color:var(--muted);font-size:12px;padding:4px 0}
+.list-head span:not(:first-child){text-align:right}
+.item{padding:3px 0}
+.item output{font-family:var(--f-num);font-size:13px;text-align:right;color:var(--muted)}
+.del{border:0;background:none;color:var(--muted);font-size:18px;line-height:1;cursor:pointer;padding:4px;border-radius:4px}
+.del:hover{color:var(--bad)}
+.add,.reset{font:inherit;font-size:13px;color:var(--accent);background:none;border:1px dashed var(--line);border-radius:4px;padding:6px 10px;cursor:pointer;margin-top:6px}
+.reset{border-style:solid;color:var(--muted)}
+.sum{display:flex;justify-content:space-between;padding:8px 0 0;font-weight:600}
+.sum b{font-family:var(--f-num);font-weight:500}
+.result{position:sticky;top:calc(12px + env(safe-area-inset-top,0px));background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;min-width:0}
+@media (max-width:860px){.result{position:static}}
+.result h2{font-family:var(--f-head);font-size:16px;margin:0 0 8px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left;white-space:normal;padding-left:0}
+thead th{font-weight:500;color:var(--muted);font-size:12px;vertical-align:bottom}
+thead input{max-width:92px}
+td .v{font-family:var(--f-num);font-size:13.5px}
+td .p{display:block;color:var(--muted);font-size:11.5px;font-family:var(--f-num)}
+tr.total td{font-weight:600;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+tr.total .v{font-size:14.5px}
+tr.gap td{border:0;padding:5px 0}
+.pos{color:var(--good)} .neg{color:var(--bad)}
+.bars{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.bar-row{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;align-items:center;font-family:var(--f-num);font-size:12.5px}
+.bar{display:flex;height:18px;border-radius:3px;overflow:hidden;background:var(--line)}
+.bar i{display:block;height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:12px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+.note{color:var(--muted);font-size:12.5px;margin:12px 0 0}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input{width:220px}
+.dl{font:inherit;font-size:13px;font-weight:600;color:var(--accent-ink);background:var(--accent);border:0;border-radius:4px;padding:8px 12px;cursor:pointer}
+</style></head><body>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Калькулятор аренды эндуро</h1>
+      <p>Экономика одних суток аренды. Меняйте любые цифры слева, итог справа пересчитается сразу. Значения сохраняются в этом браузере.</p>
+    </div>
+    <div class="tools"><input type="text" id="variant" data-k="variant" placeholder="Название варианта" aria-label="Название варианта"><button class="dl" id="xlsBtn" type="button">Скачать Excel</button><button class="reset" id="resetBtn" type="button">Вернуть исходные цифры</button></div>
+  </header>
+
+  <div class="grid">
+    <div class="inputs" id="inputs">
+      <fieldset>
+        <legend>Мотоцикл и загрузка</legend>
+        <div class="row"><label for="bikePrice">Цена мотоцикла, ₽</label><input type="number" id="bikePrice" data-k="bikePrice" min="0" step="1000"></div>
+        <div class="row"><label for="resale">Продадите потом за, % от цены</label><input type="number" id="resale" data-k="resale" min="0" max="100"></div>
+        <div class="row"><label for="years">Через сколько лет продадите</label><input type="number" id="years" data-k="years" min="0.5" step="0.5"></div>
+        <div class="row"><label for="days">Дней аренды на мотоцикл в год<small>главная цифра: от неё зависит амортизация на заказ</small></label><input type="number" id="days" data-k="days" min="1"></div>
+        <div class="row"><label for="km">Пробег за сутки аренды, км</label><input type="number" id="km" data-k="km" min="1"></div>
+        <div class="row"><label for="bikes">Мотоциклов в парке</label><input type="number" id="bikes" data-k="bikes" min="1"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Бензин</legend>
+        <div class="row"><label for="tank">Литров на сутки</label><input type="number" id="tank" data-k="tank" min="0" step="0.5"></div>
+        <div class="row"><label for="fuelPrice">Цена литра, ₽</label><input type="number" id="fuelPrice" data-k="fuelPrice" min="0"></div>
+        <div class="check"><input type="checkbox" id="fuelClient" data-k="fuelClient"><label for="fuelClient">Бензин оплачивает клиент (выдали с полным баком, приняли с полным)</label></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Расходники</legend>
+        <p class="hint">Цена одной замены и на сколько километров её хватает. Справа расход на сутки.</p>
+        <div class="list-head cols3"><span>Статья</span><span>Цена, ₽</span><span>Хватает, км</span><span>₽/сут</span><span></span></div>
+        <div id="consList"></div>
+        <button class="add" type="button" data-add="cons">Добавить статью</button>
+        <div class="sum"><span>Расходники на сутки</span><b id="consSum"></b></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Запчасти и ремонт</legend>
+        <p class="hint">То, что изнашивается и ломается. Считается так же: цена и ресурс в километрах.</p>
+        <div class="list-head cols3"><span>Статья</span><span>Цена, ₽</span><span>Хватает, км</span><span>₽/сут</span><span></span></div>
+        <div id="partsList"></div>
+        <button class="add" type="button" data-add="parts">Добавить статью</button>
+        <div class="sum"><span>Запчасти на сутки</span><b id="partsSum"></b></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Прочие расходы</legend>
+        <div class="row"><label for="ads">Реклама на один заказ, ₽</label><input type="number" id="ads" data-k="ads" min="0"></div>
+        <div class="row"><label for="wash">Мойка после аренды, ₽</label><input type="number" id="wash" data-k="wash" min="0"></div>
+        <div class="row"><label for="ins">Страховка клиента, ₽</label><input type="number" id="ins" data-k="ins" min="0"></div>
+        <div class="row"><label for="tax">Налог, % от выручки<small>УСН «Доходы» 6%, взносы ИП вычитаются из него</small></label><input type="number" id="tax" data-k="tax" min="0" step="0.5"></div>
+        <div class="row"><label for="acq">Эквайринг, % от выручки</label><input type="number" id="acq" data-k="acq" min="0" step="0.1"></div>
+        <div class="row"><label for="fixedM">Постоянные расходы в месяц, ₽<small>касса, счёт, бухгалтерия, запись, GPS, страховка</small></label><input type="number" id="fixedM" data-k="fixedM" min="0" step="500"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Экипировка</legend>
+        <p class="hint">Состав одного комплекта. Сдаётся отдельной услугой.</p>
+        <div class="list-head cols2"><span>Предмет</span><span>Цена, ₽</span><span></span></div>
+        <div id="gearList"></div>
+        <button class="add" type="button" data-add="gear">Добавить предмет</button>
+        <div class="sum"><span>Комплект стоит</span><b id="gearSum"></b></div>
+        <div class="row"><label for="gearUses">Выдач до замены комплекта</label><input type="number" id="gearUses" data-k="gearUses" min="1"></div>
+        <div class="row"><label for="gearClean">Чистка после выдачи, ₽</label><input type="number" id="gearClean" data-k="gearClean" min="0"></div>
+        <div class="row"><label for="gearPrice">Цена аренды комплекта, ₽</label><input type="number" id="gearPrice" data-k="gearPrice" min="0" step="100"></div>
+        <div class="row"><label for="gearShare">Доля заказов с экипировкой, %</label><input type="number" id="gearShare" data-k="gearShare" min="0" max="100"></div>
+        <div class="sum"><span>Остаётся с одной выдачи</span><b id="gearNet"></b></div>
+      </fieldset>
+    </div>
+
+    <aside class="result" aria-live="polite">
+      <h2>Одни сутки аренды при трёх ценах</h2>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>Цена суток, ₽</th>
+            <th><input type="number" id="price0" data-p="0" step="500" min="0" aria-label="Цена 1"></th>
+            <th><input type="number" id="price1" data-p="1" step="500" min="0" aria-label="Цена 2"></th>
+            <th><input type="number" id="price2" data-p="2" step="500" min="0" aria-label="Цена 3"></th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="bars" id="bars"></div>
+      <div class="legend">
+        <span><i style="background:var(--s-fuel)"></i>бензин</span>
+        <span><i style="background:var(--s-serv)"></i>расходники и запчасти</span>
+        <span><i style="background:var(--s-amort)"></i>амортизация</span>
+        <span><i style="background:var(--s-other)"></i>реклама, мойка, постоянные</span>
+        <span><i style="background:var(--s-tax)"></i>налог и эквайринг</span>
+        <span><i style="background:var(--s-profit)"></i>чистыми</span>
+      </div>
+      <p class="note" id="note"></p>
+    </aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(function(){
+  var KEY='enduro-calc-v1';
+  var DEF={variant:'',bikePrice:230000,resale:50,years:2,days:50,km:70,bikes:4,prices:[5000,6000,7000],
+    tank:9,fuelPrice:85,fuelClient:false,
+    cons:[{n:'Масло и масляный фильтр',c:1500,r:700},{n:'Обслуживание воздушного фильтра',c:500,r:700},{n:'Смазка цепи',c:700,r:1000},{n:'Смазка подшипников, жидкости',c:1000,r:1400}],
+    parts:[{n:'Резина',c:11000,r:3000},{n:'Цепь и звёзды',c:6000,r:5000},{n:'Тормозные колодки',c:1500,r:2000},{n:'Рычаги, ручки, пластик после падений',c:3000,r:700},{n:'Резерв на крупный ремонт',c:15000,r:7000}],
+    ads:800,wash:100,ins:0,tax:6,acq:2,fixedM:15000,
+    gear:[{n:'Шлем',c:7000},{n:'Очки',c:2000},{n:'Защита тела',c:5000},{n:'Наколенники',c:2500},{n:'Перчатки',c:1200},{n:'Мотоботы',c:12000}],
+    gearUses:100,gearClean:100,gearPrice:1500,gearShare:60};
+  var S=load();
+  function clone(o){return JSON.parse(JSON.stringify(o));}
+  function load(){try{var t=localStorage.getItem(KEY);if(t){var o=JSON.parse(t);return Object.assign(clone(DEF),o);}}catch(e){}return clone(DEF);}
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+  function $(id){return document.getElementById(id);}
+  function num(v){var x=parseFloat(v);return isFinite(x)?x:0;}
+  function rub(x){return Math.round(x).toLocaleString('ru-RU')+' ₽';}
+  function esc(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+  function perDay(list){var s=0;list.forEach(function(i){if(num(i.r)>0)s+=num(i.c)/num(i.r)*S.km;});return s;}
+
+  function calc(price){
+    var o={};
+    o.fuel=S.fuelClient?0:S.tank*S.fuelPrice;
+    o.cons=perDay(S.cons); o.parts=perDay(S.parts);
+    var rentDays=Math.max(1,S.years*S.days);
+    o.amort=S.bikePrice*(1-S.resale/100)/rentDays;
+    o.ads=S.ads; o.wash=S.wash+S.ins;
+    o.tax=price*S.tax/100; o.acq=price*S.acq/100;
+    o.left=price-o.fuel-o.cons-o.parts-o.amort-o.ads-o.wash-o.tax-o.acq;
+    o.orders=Math.max(1,S.bikes*S.days);
+    o.fixed=S.fixedM*12/o.orders;
+    o.net=o.left-o.fixed;
+    o.gearCost=S.gear.reduce(function(a,i){return a+num(i.c);},0);
+    o.gearWear=o.gearCost/Math.max(1,S.gearUses);
+    o.gearNet=S.gearPrice-o.gearWear-S.gearClean-S.gearPrice*(S.tax+S.acq)/100;
+    o.gearAvg=o.gearNet*S.gearShare/100;
+    o.total=o.net+o.gearAvg;
+    o.year=o.total*o.orders;
+    o.invest=S.bikes*(S.bikePrice+o.gearCost);
+    var cashYear=o.year+(o.amort+o.gearWear*S.gearShare/100)*o.orders;
+    o.payback=cashYear>0?o.invest/cashYear*12:null;
+    return o;
+  }
+
+  function renderList(key){
+    var box=$(key+'List'), three=key!=='gear';
+    box.innerHTML=S[key].map(function(i,ix){
+      return '<div class="item '+(three?'cols3':'cols2')+'">'+
+        '<input type="text" id="'+key+'-n-'+ix+'" data-l="'+key+'" data-i="'+ix+'" data-f="n" value="'+esc(i.n)+'" aria-label="Название">'+
+        '<input type="number" id="'+key+'-c-'+ix+'" data-l="'+key+'" data-i="'+ix+'" data-f="c" value="'+num(i.c)+'" min="0" aria-label="Цена">'+
+        (three?'<input type="number" id="'+key+'-r-'+ix+'" data-l="'+key+'" data-i="'+ix+'" data-f="r" value="'+num(i.r)+'" min="1" aria-label="Ресурс, км"><output id="'+key+'-o-'+ix+'"></output>':'')+
+        '<button class="del" type="button" data-del="'+key+'" data-i="'+ix+'" aria-label="Удалить">×</button></div>';
+    }).join('');
+  }
+  function fillInputs(){
+    document.querySelectorAll('[data-k]').forEach(function(el){
+      if(el.type==='checkbox')el.checked=!!S[el.dataset.k]; else el.value=S[el.dataset.k];
+    });
+    document.querySelectorAll('[data-p]').forEach(function(el){el.value=S.prices[+el.dataset.p];});
+    ['cons','parts','gear'].forEach(renderList);
+  }
+
+  function cell(v,price,cls){
+    var p=price>0?Math.round(v/price*100):0;
+    return '<td><span class="v '+(cls||'')+'">'+rub(v)+'</span><span class="p">'+p+'%</span></td>';
+  }
+  function render(){
+    var R=S.prices.map(calc);
+    ['cons','parts'].forEach(function(k){
+      S[k].forEach(function(i,ix){var o=$(k+'-o-'+ix);if(o)o.textContent=num(i.r)>0?Math.round(num(i.c)/num(i.r)*S.km):'0';});
+    });
+    $('consSum').textContent=rub(R[0].cons); $('partsSum').textContent=rub(R[0].parts);
+    $('gearSum').textContent=rub(R[0].gearCost);
+    $('gearNet').textContent=rub(R[0].gearNet); $('gearNet').className=R[0].gearNet>=0?'pos':'neg';
+    var rows=[['Бензин','fuel'],['Расходники','cons'],['Запчасти и ремонт','parts'],['Амортизация мотоцикла','amort'],['Реклама','ads'],['Мойка и страховка','wash'],['Налог','tax'],['Эквайринг','acq']];
+    var h=rows.map(function(r){return '<tr><td>'+r[0]+'</td>'+R.map(function(o,i){return cell(o[r[1]],S.prices[i]);}).join('')+'</tr>';}).join('');
+    function tot(label,k){return '<tr class="total"><td>'+label+'</td>'+R.map(function(o,i){return cell(o[k],S.prices[i],o[k]>=0?'pos':'neg');}).join('')+'</tr>';}
+    h+=tot('Остаётся с заказа','left');
+    h+='<tr><td>Постоянные расходы на заказ</td>'+R.map(function(o,i){return cell(o.fixed,S.prices[i]);}).join('')+'</tr>';
+    h+=tot('Чистыми с заказа','net');
+    h+='<tr><td>Экипировка, в среднем на заказ</td>'+R.map(function(o,i){return cell(o.gearAvg,S.prices[i]);}).join('')+'</tr>';
+    h+=tot('Итого с заказа','total');
+    h+='<tr class="gap"><td colspan="4"></td></tr>';
+    h+='<tr><td>Заказов в год</td>'+R.map(function(o){return '<td><span class="v">'+Math.round(o.orders)+'</span></td>';}).join('')+'</tr>';
+    h+='<tr class="total"><td>Прибыль за год</td>'+R.map(function(o){return '<td><span class="v '+(o.year>=0?'pos':'neg')+'">'+rub(o.year)+'</span></td>';}).join('')+'</tr>';
+    h+='<tr><td>Вложения в технику и экипировку</td>'+R.map(function(o){return '<td><span class="v">'+rub(o.invest)+'</span></td>';}).join('')+'</tr>';
+    h+='<tr><td>Вернутся за, месяцев</td>'+R.map(function(o){return '<td><span class="v">'+(o.payback?Math.round(o.payback):'не вернутся')+'</span></td>';}).join('')+'</tr>';
+    $('tbody').innerHTML=h;
+
+    $('bars').innerHTML=R.map(function(o,i){
+      var seg=[['--s-fuel',o.fuel],['--s-serv',o.cons+o.parts],['--s-amort',o.amort],['--s-other',o.ads+o.wash+o.fixed],['--s-tax',o.tax+o.acq],['--s-profit',Math.max(0,o.net)]];
+      var sum=seg.reduce(function(a,s){return a+s[1];},0)||1;
+      return '<div class="bar-row"><span>'+Math.round(S.prices[i]).toLocaleString('ru-RU')+'</span><div class="bar">'+
+        seg.map(function(s){return '<i style="width:'+(s[1]/sum*100).toFixed(2)+'%;background:var('+s[0]+')"></i>';}).join('')+'</div></div>';
+    }).join('');
+
+    var o=R[0], cost=o.fuel+o.cons+o.parts+o.amort+o.ads+o.wash+o.fixed, k=1-(S.tax+S.acq)/100;
+    var be=k>0?cost/k:0;
+    $('note').textContent='Цена суток, при которой заказ выходит в ноль без экипировки: '+rub(be)+'. Амортизация считается на '+Math.round(S.years*S.days)+' дней аренды за весь срок службы мотоцикла. Возврат вложений считается от денег, которые реально приходят за год: прибыль плюс отложенная амортизация.';
+  }
+
+  document.addEventListener('input',function(e){
+    var t=e.target;
+    if(t.dataset.k){S[t.dataset.k]=t.type==='checkbox'?t.checked:(t.type==='text'?t.value:num(t.value));}
+    else if(t.dataset.p){S.prices[+t.dataset.p]=num(t.value);}
+    else if(t.dataset.l){var it=S[t.dataset.l][+t.dataset.i];it[t.dataset.f]=t.dataset.f==='n'?t.value:num(t.value);}
+    else return;
+    save(); render();
+  });
+  document.addEventListener('click',function(e){
+    var t=e.target;
+    if(t.dataset.add){var k=t.dataset.add;S[k].push(k==='gear'?{n:'Новый предмет',c:0}:{n:'Новая статья',c:0,r:1000});renderList(k);}
+    else if(t.dataset.del){S[t.dataset.del].splice(+t.dataset.i,1);renderList(t.dataset.del);}
+    else if(t.id==='resetBtn'){S=clone(DEF);fillInputs();}
+    else if(t.id==='xlsBtn'){download();return;}
+    else return;
+    save(); render();
+  });
+  function r0(x){return Math.round(x);}
+  function buildWb(){
+    var R=S.prices.map(calc), o=R[0], nm=S.variant||'Вариант', d=new Date();
+    var stamp=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    var P=[['Вариант',nm],['Дата',stamp],[],
+      ['МОТОЦИКЛ И ЗАГРУЗКА'],['Цена мотоцикла, ₽',S.bikePrice],['Продажа, % от цены',S.resale],['Срок службы, лет',S.years],['Дней аренды на мотоцикл в год',S.days],['Пробег за сутки, км',S.km],['Мотоциклов в парке',S.bikes],[],
+      ['БЕНЗИН'],['Литров на сутки',S.tank],['Цена литра, ₽',S.fuelPrice],['Бензин оплачивает клиент',S.fuelClient?'да':'нет'],[],
+      ['РАСХОДНИКИ','Цена, ₽','Хватает, км','₽ на сутки']];
+    S.cons.forEach(function(i){P.push([i.n,num(i.c),num(i.r),num(i.r)>0?r0(num(i.c)/num(i.r)*S.km):0]);});
+    P.push(['Итого расходники на сутки','','',r0(o.cons)],[],['ЗАПЧАСТИ И РЕМОНТ','Цена, ₽','Хватает, км','₽ на сутки']);
+    S.parts.forEach(function(i){P.push([i.n,num(i.c),num(i.r),num(i.r)>0?r0(num(i.c)/num(i.r)*S.km):0]);});
+    P.push(['Итого запчасти на сутки','','',r0(o.parts)],[],
+      ['ПРОЧИЕ РАСХОДЫ'],['Реклама на заказ, ₽',S.ads],['Мойка, ₽',S.wash],['Страховка клиента, ₽',S.ins],['Налог, %',S.tax],['Эквайринг, %',S.acq],['Постоянные расходы в месяц, ₽',S.fixedM],[],
+      ['ЭКИПИРОВКА','Цена, ₽']);
+    S.gear.forEach(function(i){P.push([i.n,num(i.c)]);});
+    P.push(['Комплект стоит',r0(o.gearCost)],['Выдач до замены',S.gearUses],['Чистка после выдачи, ₽',S.gearClean],['Цена аренды комплекта, ₽',S.gearPrice],['Доля заказов с экипировкой, %',S.gearShare],['Остаётся с одной выдачи, ₽',r0(o.gearNet)]);
+    var head=['Статья'];S.prices.forEach(function(p){head.push('Цена '+p+', ₽','%');});
+    var T=[['Вариант',nm],[],head];
+    function line(label,k,pct){var a=[label];R.forEach(function(x,i){a.push(r0(x[k]));a.push(pct===false?'':(S.prices[i]>0?r0(x[k]/S.prices[i]*100):0));});T.push(a);}
+    [['Бензин','fuel'],['Расходники','cons'],['Запчасти и ремонт','parts'],['Амортизация мотоцикла','amort'],['Реклама','ads'],['Мойка и страховка','wash'],['Налог','tax'],['Эквайринг','acq'],['Остаётся с заказа','left'],['Постоянные расходы на заказ','fixed'],['Чистыми с заказа','net'],['Экипировка, в среднем на заказ','gearAvg'],['Итого с заказа','total']].forEach(function(r){line(r[0],r[1]);});
+    T.push([]);line('Заказов в год','orders',false);line('Прибыль за год','year',false);line('Вложения в технику и экипировку','invest',false);
+    var pb=['Вернутся за, месяцев'];R.forEach(function(x){pb.push(x.payback?r0(x.payback):'не вернутся','');});T.push(pb);
+    var H=['Вариант','Дата','Мотоциклов','Цена мотоцикла','Дней аренды в год','Бензин за счёт клиента','Расходы на сутки без налога, ₽','Постоянные в месяц','Комплект экипировки','Аренда комплекта'],V=[nm,stamp,S.bikes,S.bikePrice,S.days,S.fuelClient?'да':'нет',r0(o.fuel+o.cons+o.parts+o.amort+o.ads+o.wash),S.fixedM,r0(o.gearCost),S.gearPrice];
+    R.forEach(function(x,i){var p=S.prices[i];H.push('Цена '+(i+1),'Итого с заказа '+(i+1),'Прибыль за год '+(i+1),'Окупаемость, мес '+(i+1));V.push(p,r0(x.total),r0(x.year),x.payback?r0(x.payback):'не вернутся');});
+    var wb=XLSX.utils.book_new();
+    var w1=XLSX.utils.aoa_to_sheet(T);w1['!cols']=[{wch:34},{wch:14},{wch:6},{wch:14},{wch:6},{wch:14},{wch:6}];
+    var w2=XLSX.utils.aoa_to_sheet(P);w2['!cols']=[{wch:40},{wch:14},{wch:14},{wch:12}];
+    var w3=XLSX.utils.aoa_to_sheet([H,V]);w3['!cols']=H.map(function(){return {wch:18};});
+    XLSX.utils.book_append_sheet(wb,w1,'Результат');XLSX.utils.book_append_sheet(wb,w2,'Параметры');XLSX.utils.book_append_sheet(wb,w3,'Сводка одной строкой');
+    return {wb:wb,file:(nm+' '+stamp.replace(':','-')+'.xlsx')};
+  }
+  function download(){
+    if(typeof XLSX==='undefined'){$('note').textContent='Не удалось загрузить модуль Excel: проверьте интернет и обновите страницу.';return;}
+    var b=buildWb();XLSX.writeFile(b.wb,b.file);
+  }
+  window.enduroBuildWorkbook=buildWb;
+  fillInputs(); render();
+})();
+</script>
+</body></html>
